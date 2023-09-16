@@ -26,7 +26,7 @@
 
     let query: QueryData = {
         query: $history[0]?.query ?? '!unixporn@lemmy.ml',
-        sort: 1,
+        sort: $history[0]?.sort ?? 1,
     };
 
     const update = async () => {

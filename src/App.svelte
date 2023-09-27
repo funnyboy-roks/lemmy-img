@@ -121,6 +121,11 @@
                     e.preventDefault()
                     prevPost();
                     break;
+                case 'h':
+                    e.preventDefault();
+                    // @ts-ignore
+                    showHistory ^= 1;
+                    break;
                 case '/': 
                     e.preventDefault();
                     queryInput.select();

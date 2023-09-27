@@ -28,7 +28,6 @@
 <div class="overlay" on:click={close}></div>
 <div class="history">
     <button class="close x" on:click={close}>&times;</button>
-    <button class="delete-all x" on:click={deleteAll}>Delete All</button>
     <h1>History:</h1>
     <ul>
     {#each history as entry, i (i)}
@@ -38,6 +37,7 @@
         </li>
     {/each}
     </ul>
+    <button class="delete-all x" on:click={deleteAll}>Delete All</button>
 </div>
 
 <style>
@@ -60,9 +60,21 @@
         height: 100vh;
         color: lightgrey;
         padding: 0;
+        height: 100%;
+
+        display: flex;
+        flex-direction: column;
 
         font-size: 1.5rem;
+    }
+
+    h1 {
         padding-left: 2rem;
+    }
+
+    ul {
+        overflow: scroll;
+        margin: 0 2rem;
     }
 
     .close {
@@ -81,9 +93,10 @@
     }
 
     .delete-all {
-        position: fixed;
-        left: 2rem;
-        bottom: 2rem;
+        padding: 0;
+        margin-bottom: 2rem;
+        margin-top: auto;
+        margin-left: 0;
     }
 
     button {

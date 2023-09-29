@@ -4,4 +4,52 @@ html, body {
     padding: 0;
     color: lightgrey;
     font-family: sans-serif;
+    background: black;
+}
+
+button, input, select {
+    max-width: 20rem;
+    background: #333;
+    padding: .25rem;
+    color: lightgrey;
+    font-size: 1.2rem;
+    outline: none;
+    border: 2px solid grey;
+    border-radius: 5px;
+    margin: .25rem;
+
+    transition: background 100ms ease-in-out;
+}
+
+button:focus, input:focus, select:focus {
+    outline: 2px solid AccentColor;
+}
+
+button {
+    cursor: pointer;
+    padding: .25rem 1rem;
+}
+
+button:hover {
+    background: #444;
+}
+
+input {
+    width: 15rem;
+}
+
+.query-link {
+    text-decoration: 2px dotted underline;
+    width: unset;
+    background: unset;
+    padding: unset;
+    color: unset;
+    font-size: unset;
+    outline: none;
+    border: none;
+    margin: unset;
+}
+
+.query-link:hover {
+    text-decoration: 2px solid underline;
 }

@@ -1,13 +1,12 @@
 <script lang="ts">
-    import { createEventDispatcher } from 'svelte';
+    import { createEventDispatcher, onMount } from 'svelte';
     import { sortsFormatted } from '../constants';
+    import { history, modal } from '../stores';
 
     const dispatch = createEventDispatcher();
 
-    export let history: any[];
-
     const close = () => {
-        dispatch('close');
+        $modal = 'none';
     };
 
     const goto = (query: any) => {
@@ -15,41 +14,47 @@
     }
 
     const remove = (index: number) => {
-        dispatch('remove', index);
+        $history = $history.filter((_, i) => i !== index);
     }
 
     const deleteAll = () => {
         if (confirm('Are you sure you want to delete your full history?')) {
-            dispatch('deleteAll');
+            $history = [];
+        }
+    }
+
+    onMount(() => {
+        // @ts-ignore
+        document.querySelector('#history-entry-0')?.focus();
+    });
+
+    const keydown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            close();
         }
     }
 </script>
 
-<div class="overlay" on:click={close}></div>
+<svelte:window on:keydown={keydown} />
+
 <div class="history">
     <button class="close x" on:click={close}>&times;</button>
-    <h1>History:</h1>
+    <h1>History</h1>
     <ul>
-    {#each history as entry, i (i)}
+    {#each $history as entry, i (i)}
         <li>
-            <button on:click={() => goto(entry)}>{entry.query} ({sortsFormatted[entry.sort]})</button>
+            <button on:click={() => goto(entry)} class="query-link" id="history-entry-{i}">{entry.query} ({sortsFormatted[entry.sort]})</button>
             <button class="delete x" on:click={() => remove(i)}>&times;</button>
         </li>
+    {:else}
+        Your history is empty
     {/each}
     </ul>
     <button class="delete-all x" on:click={deleteAll}>Delete All</button>
 </div>
 
 <style>
-    .overlay {
-        position: fixed;
-        left: 0;
-        top: 0;
-        background: #222a;
-        width: 100vw;
-        height: 100vh;
-    }
-
     .history {
         position: fixed;
         left: 0;
@@ -75,12 +80,13 @@
     ul {
         overflow: scroll;
         margin: 0 2rem;
+        height: 90%;
     }
 
     .close {
         position: absolute;
         right: 2rem;
-        top: 2rem;
+        top: .8rem;
         font-size: 5rem;
     }
 
@@ -94,22 +100,19 @@
 
     .delete-all {
         padding: 0;
+        margin: 2rem auto;
         margin-bottom: 2rem;
-        margin-top: auto;
-        margin-left: 0;
+        align-self: flex-end;
     }
 
     button {
-        font-size: 1.5rem;
+        text-align: left;
+        width: unset;
         background: none;
         border: none;
         outline: none;
 
         color: inherit;
         cursor: pointer;
-    }
-
-    button:hover {
-        color: grey;
     }
 </style>

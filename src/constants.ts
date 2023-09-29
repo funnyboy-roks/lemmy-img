@@ -1,3 +1,6 @@
+/**
+ * Named sorts used by the api
+ */
 export const sorts = [
     'Active',
     'Hot',
@@ -12,6 +15,9 @@ export const sorts = [
     'NewComments',
 ];
 
+/**
+ * Formatted sort names for the ui
+ */
 export const sortsFormatted = [
     'Active',
     'Hot',

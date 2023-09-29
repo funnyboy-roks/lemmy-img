@@ -1,28 +1,23 @@
 <script lang="ts">
     import History from "./lib/History.svelte";
-    import { persisted as localStore } from 'svelte-local-storage-store';
+    import Communities from "./lib/Communities.svelte";
+    import Settings from "./lib/Settings.svelte";
+    import Overlay from "./lib/Overlay.svelte";
 
     import { sorts, sortsFormatted } from './constants';
 
+    import { mention, userFromActor, communityFromActor } from './util'
+    import { history, type QueryData, modal, settings } from './stores';
+
     let loading = false;
 
-    interface QueryData {
-        query: string,
-        sort: number,
-    }
-
     let queryInput: any;
-
-    let showHistory = false;
-    let history = localStore<QueryData[]>('history', []);
-    let instanceStore = localStore<string>('instance', 'https://lemmy.ml');
 
     let index = 0;
     let posts: any[] = [];
     let pageIndex = 0;
     let userquery: boolean = false;
-
-    let instance = $instanceStore;
+    let status: string | null = null;
 
     let query: QueryData = {
         query: $history[0]?.query ?? '!unixporn@lemmy.ml',
@@ -35,35 +30,60 @@
         index = 0;
         pageIndex = 0;
         posts = [];
-        $instanceStore = instance;
         userquery = query.query.startsWith('@')
-        await getNextPosts();
-        updateHistory();
+        if (await getNextPosts()) {
+            updateHistory();
+            status = null;
+        }
         loading = false;
     }
 
     const getNextPosts = async () => {
         let url;
 
-        let instanceClean = instance.replace(/\/+$/, '');
+        let instanceClean = $settings.instance.replace(/\/+$/, '');
         if (userquery) {
-            url = `${instanceClean}/api/v3/user?username=${query.query.substring(1)}&sort=${sorts[query.sort]}&page=${++pageIndex}`;
+            url = `${instanceClean}/api/v3/user?username=${query.query.substring(1)}&sort=${sorts[query.sort]}&page=${++pageIndex}&limit=20`;
         } else {
             const name = query.query.startsWith('!') ? query.query.substring(1) : query.query;
-            url = `${instanceClean}/api/v3/post/list?community_name=${name}&sort=${sorts[query.sort]}&page=${++pageIndex}`;
+            url = `${instanceClean}/api/v3/post/list?community_name=${name}&sort=${sorts[query.sort]}&page=${++pageIndex}&limit=20`;
         }
 
         console.log('getting next posts from', url);
         const res = await fetch(url);
+        if (res.status === 404) {
+            status = 'Unknown community or user'
+            return false;
+        }
         const body = await res.json();
 
         console.log('got body:', body);
+        const postCounts = body.posts.length;
         const resPosts = body
             .posts
-            .filter((b: any) => b.post.url);
-            console.log('got posts:', resPosts);
+            .filter((b: any) => {
+                const user = userFromActor(b.creator.actor_id);
+                const comm = communityFromActor(b.community.actor_id)
+                return b.post.url
+                    && !(userquery && $settings.blocked_instances.includes(new URL(b.community.actor_id).hostname))
+                    && !$settings.blocked_instances.includes(userFromActor(b.creator.actor_id).instance)
+                    && !$settings.blocked_users.some(u => u.name === user.name && u.instance === user.instance)
+                    && !(userquery && $settings.blocked_communities.some(c => c.name === comm.name && c.instance === comm.instance))
+                    && (b.post.nsfw && $settings.nsfw !== 'block' || !b.post.nsfw)
+                    && !(!b.post.nsfw && $settings.nsfw === 'filter')
+                    && (b.creator.bot_account && $settings.bot_posts !== 'block' || !b.creator.bot_account)
+                    && !(!b.creator.bot_account && $settings.bot_posts === 'filter')
+                    ;
+            });
+        console.log('got posts:', resPosts);
+
+        if (posts.length + resPosts.length === 0) {
+            status = postCounts ? 'Found 0 posts using specified filters.' : 'Found no posts';
+            return false;
+        }
 
         posts = [...posts, ...resPosts];
+        return true;
     };
 
     const nextPost = () => {
@@ -89,27 +109,24 @@
         h.unshift(query);
         $history = h;
         query = { ...query };
-        console.log('history update', $history);
     }
 
     const historyGoto = (dest: any) => {
         const q = dest.detail;
         query = q;
-        showHistory = false;
+        $modal = 'none';
         update();
     };
 
-    const historyRemove = (dest: any) => {
-        $history = $history.filter((_, i) => i !== dest.detail);
+    const communityGoto = (dest: any) => {
+        //alert('todo');
+        const q = dest.detail;
+        query.query = q;
+        $modal = 'communities';
+        update();
     };
 
-    const mention = (prefix: string, { name, actor_id }: any): string => {
-        const instance = new URL(actor_id).hostname;
-        return `${prefix}${name}@${instance}`;
-    }
-
     const keydown = (e: KeyboardEvent) => {
-        console.log(e);
         // @ts-ignore
         if (e.target.nodeName !== 'INPUT') {
             switch (e.key) {
@@ -124,7 +141,27 @@
                 case 'h':
                     e.preventDefault();
                     // @ts-ignore
-                    showHistory ^= 1;
+                    if ($modal === 'history') {
+                        $modal = 'none';
+                    } else {
+                        $modal = 'history';
+                    }
+                    break;
+                case 'c':
+                    e.preventDefault();
+                    if ($modal === 'communities') {
+                        $modal = 'none';
+                    } else {
+                        $modal = 'communities';
+                    }
+                    break;
+                case 's':
+                    e.preventDefault();
+                    if ($modal === 'settings') {
+                        $modal = 'none';
+                    } else {
+                        $modal = 'settings';
+                    }
                     break;
                 case '/': 
                     e.preventDefault();
@@ -149,7 +186,7 @@
         }
 
         if (post.embed_video_url) {
-            type = 'video';
+            type = 'embed';
             link = post.embed_video_url;
         }
 
@@ -166,12 +203,20 @@
     {/if}
 </svelte:head>
 
-{#if showHistory}
-    <History history={$history} on:close={() => showHistory = false} on:goto={historyGoto} on:remove={historyRemove} on:deleteAll={() => $history = []} />
+{#if $modal === 'history'}
+    <Overlay />
+    <History on:goto={historyGoto} />
+{:else if $modal === 'communities'}
+    <Overlay />
+    <Communities on:goto={communityGoto} />
+{:else if $modal === 'settings'}
+    <Overlay />
+    <Settings on:goto={communityGoto} on:close={() => {update()}} />
 {/if}
+
 <main>
     <div class="top">
-        <button on:click={() => showHistory = !showHistory}>Open History</button>
+        <button on:click={() => $modal = 'history'}>Open History <code>(h)</code></button>
 
         <form on:submit|preventDefault={update}>
             <label for="query">Query<label>
@@ -184,51 +229,63 @@
                 {/each}
             </select>
 
-            <label for="instance">Instance<label>
-            <input id="instance" bind:value={instance} type="text"/>
-
             <button type="submit">Update</button>
         </form>
 
         <div class="right">
-            {#if loading}
-                <p>Loading...</p>
-            {/if}
+            <button on:click={() => $modal = 'communities'}>Search Communities <code>(c)</code></button>
         </div>
     </div>
 
     <div class="nav">
-        <button on:click={prevPost} disabled={index === 0}>Prev</button>
+        <button on:click={prevPost} disabled={index === 0}>Prev <code>(←)</code></button>
         <p>{index + 1} / {posts.length}</p>
-        <button on:click={nextPost} disabled={index === posts.length - 1}>Next</button>
+        <button on:click={nextPost} disabled={index === posts.length - 1}>Next <code>(→)</code></button>
     </div>
 
-    {#if posts[index] && posts[index].post}
-        {@const {counts} = posts[index]}
-        {@const { type, link } = getType(posts[index])}
-        <h1 style="text-align: center">{posts[index].post.name}</h1>
-        <div class="post-info">
-            <h2>
-                {#if userquery}
-                    {@const community = mention('!', posts[index].community)}
-                    In <button class="query-link" on:click={() => {query.query = community; update()}}>{community}</button>
-                {:else}
-                    {@const user = mention('@', posts[index].creator)}
-                    By <button class="query-link" on:click={() => {query.query = user; update()}}>{user}</button>
-                {/if}
-            </h2>
-            <h2 class="score">
-                <span class:positive={counts.score > 0} class:negative={counts.score < 0}>{counts.score}</span>({(counts.score * 100 / counts.upvotes)|0}%)
-            </h2>
-        </div>
-        {#if type === 'video'}
-            <video src="{link}" autoplay controls />
-        {:else if type === 'image'}
-            <img src="{link}" alt="post img"/>
-        {:else}
-            <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" />
+    {#if loading}
+        <h1>Loading...</h1>
+    {/if}
+
+    {#if status}
+        <h1>{status}</h1>
+    {:else}
+        {#if posts[index] && posts[index].post}
+            {@const {counts} = posts[index]}
+            {@const { type, link } = getType(posts[index])}
+            <h1>{posts[index].post.name}</h1>
+            <div class="post-info">
+                <h2>
+                    {#if userquery}
+                        {@const community = mention('!', posts[index].community, $settings.instance)}
+                        In <button class="query-link" on:click={() => {query.query = community; update()}}>{community}</button>
+                    {:else}
+                        {@const user = mention('@', posts[index].creator, $settings.instance)}
+                        By <button class="query-link" on:click={() => {query.query = user; update()}}>{user}</button>
+                    {/if}
+                </h2>
+                <h2 class="score">
+                    <span class:positive={counts.score > 0} class:negative={counts.score < 0}>{counts.score}</span>({(counts.score * 100 / counts.upvotes)|0}%)
+                </h2>
+            </div>
+
+            {#if type === 'video'}
+                <video src="{link}" autoplay controls loop />
+            {:else if type === 'image'}
+                <img src="{link}" alt="post img"/>
+            {:else}
+                <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" />
+            {/if}
         {/if}
     {/if}
+
+    <div class="bottom">
+        <div></div>
+        <div></div>
+        <div class="right">
+            <button on:click={() => $modal = 'settings'}>Settings <code>(s)</code></button>
+        </div>
+    </div>
 </main>
 
 <style>
@@ -244,45 +301,8 @@
         font-weight: normal;
     }
 
-    .query-link {
-        text-decoration: 2px dotted underline;
-        width: unset;
-        background: unset;
-        padding: unset;
-        color: unset;
-        font-size: unset;
-        outline: none;
-        border: none;
-        margin: unset;
-    }
-
-    .query-link:hover {
-        text-decoration: 2px solid underline;
-    }
-
-
-    button, input, select {
-        width: 10rem;
-        background: #333;
-        padding: .25rem;
-        color: lightgrey;
-        font-size: 1.2rem;
-        outline: none;
-        border: 2px solid grey;
-        border-radius: 5px;
-        margin: .25rem;
-    }
-
-    button:focus, input:focus, select:focus {
-        outline: 2px solid AccentColor;
-    }
-
-    button {
-        cursor: pointer;
-    }
-
-    input {
-        width: 15rem;
+    h1 {
+        text-align: center;
     }
 
     form {
@@ -300,18 +320,11 @@
         width: unset;
     }
 
-    .top {
+    .top, .bottom {
         display: flex;
         flex-direction: row;
         justify-content: space-between;
         width: 100%
-    }
-
-    .post {
-        margin: 0 auto;
-        text-align: center;
-        display: flex;
-        flex-direction: column;
     }
 
     .post-info {
@@ -339,11 +352,14 @@
         margin: 0;
     }
 
-    img, video {
+    img, video, iframe {
         flex-grow: initial;
-        max-width: 85%;
-        max-height: 75%;
+        height: 75%;
         margin: auto;
         border-radius: 5px;
+    }
+
+    iframe {
+        width: 100%;
     }
 </style>

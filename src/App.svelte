@@ -186,7 +186,7 @@
         }
 
         if (post.embed_video_url) {
-            type = 'embed';
+            type = 'video';
             link = post.embed_video_url;
         }
 

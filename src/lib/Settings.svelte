@@ -182,6 +182,9 @@
         margin: auto;
         width: 50%;
         padding-top: 2rem;
+        display: flex;
+        flex-direction: row;
+        justify-content: space-around;
     }
 
     .save {

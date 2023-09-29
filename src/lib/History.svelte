@@ -111,6 +111,7 @@
         background: none;
         border: none;
         outline: none;
+        font-size: 1.2rem;
 
         color: inherit;
         cursor: pointer;

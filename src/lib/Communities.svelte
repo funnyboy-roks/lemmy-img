@@ -1,7 +1,7 @@
 <script lang="ts">
     import { createEventDispatcher } from 'svelte';
     import { sorts, sortsFormatted } from '../constants';
-    import { mention, communityFromActor } from '../util';
+    import { mention, communityFromActor, filterCheck } from '../util';
     import { communities as communitiesStores, instanceStore, modal, settings } from '../stores';
 
     const { query, communities } = communitiesStores;
@@ -35,7 +35,8 @@
         let coms: any[] = json.communities.filter((c: any) => {
             let comm = communityFromActor(c.community.actor_id);
             return !$settings.blocked_communities.some(c => c.instance === comm.instance && c.name === comm.name)
-            && !$settings.blocked_instances.includes(comm.instance);
+            && !$settings.blocked_instances.includes(comm.instance)
+            && filterCheck($query.nsfw, c.community.nsfw);
         });
         coms.sort((a, b) => b.counts.posts - a.counts.posts);
         $communities = coms;
@@ -68,6 +69,11 @@
                 {#each sortsFormatted as sort, i (i)}
                     <option value={i}>{sort}</option>
                 {/each}
+            </select>
+            <select id="nsfw" bind:value={$query.nsfw}>
+                <option value="allow">Allow NSFW</option>
+                <option value="block">Block NSFW</option>
+                <option value="filter">Filter NSFW</option>
             </select>
             <button type="submit">Search</button>
         </form>

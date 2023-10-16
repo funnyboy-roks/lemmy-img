@@ -1,4 +1,4 @@
-import type { User, Community } from "./stores";
+import type { User, Community, Filter } from "./stores";
 
 export const mention = (prefix: string, { name, actor_id }: any, host: string = ''): string => {
     const instance = new URL(actor_id).hostname;
@@ -23,3 +23,13 @@ export const communityFromActor = (a: string): Community => {
     let name = a.substring(a.lastIndexOf('/') + 1);
     return { name, instance };
 };
+
+/**
+ * Returns true if the given bool matches the selected filter
+ */
+export const filterCheck = (filter: Filter, bool: boolean): boolean => {
+    if (filter === 'allow') return true;
+    if (filter === 'block') return !bool;
+    if (filter === 'filter') return bool;
+    return false; // should be unreachable
+}

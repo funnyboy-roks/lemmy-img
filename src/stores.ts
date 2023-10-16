@@ -4,6 +4,7 @@ import { persisted as localStore } from 'svelte-local-storage-store';
 export interface CommunitiesQuery {
     query: string,
     sort: number,
+    nsfw: Filter,
 }
 
 export const communities = {
@@ -18,8 +19,9 @@ export interface QueryData {
 
 export const instanceStore = localStore<string>('instance', 'https://lemmy.ml');
 export const history = localStore<QueryData[]>('history', []);
+export const posts = writable<any[]>([]);
 
-export type Modal = 'none' | 'history' | 'communities' | 'settings';
+export type Modal = 'none' | 'history' | 'communities' | 'settings' | 'saved';
 export const modal = writable<Modal>('none');
 
 export interface Community {

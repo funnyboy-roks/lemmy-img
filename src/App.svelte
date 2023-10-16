@@ -3,21 +3,22 @@
     import Communities from "./lib/Communities.svelte";
     import Settings from "./lib/Settings.svelte";
     import Overlay from "./lib/Overlay.svelte";
+    import Post from "./lib/Post.svelte";
 
     import { sorts, sortsFormatted } from './constants';
 
-    import { mention, userFromActor, communityFromActor } from './util'
-    import { history, type QueryData, modal, settings } from './stores';
+    import { mention, userFromActor, communityFromActor, filterCheck } from './util'
+    import { history, type QueryData, modal, settings, posts } from './stores';
 
     let loading = false;
 
     let queryInput: any;
 
     let index = 0;
-    let posts: any[] = [];
     let pageIndex = 0;
     let userquery: boolean = false;
     let status: string | null = null;
+    let preloads: string[] = [];
 
     let query: QueryData = {
         query: $history[0]?.query ?? '!unixporn@lemmy.ml',
@@ -29,7 +30,7 @@
         loading = true;
         index = 0;
         pageIndex = 0;
-        posts = [];
+        $posts = [];
         userquery = query.query.startsWith('@')
         if (await getNextPosts()) {
             updateHistory();
@@ -69,32 +70,32 @@
                     && !$settings.blocked_instances.includes(userFromActor(b.creator.actor_id).instance)
                     && !$settings.blocked_users.some(u => u.name === user.name && u.instance === user.instance)
                     && !(userquery && $settings.blocked_communities.some(c => c.name === comm.name && c.instance === comm.instance))
-                    && (b.post.nsfw && $settings.nsfw !== 'block' || !b.post.nsfw)
-                    && !(!b.post.nsfw && $settings.nsfw === 'filter')
-                    && (b.creator.bot_account && $settings.bot_posts !== 'block' || !b.creator.bot_account)
-                    && !(!b.creator.bot_account && $settings.bot_posts === 'filter')
+                    && filterCheck($settings.nsfw, b.post.nsfw)
+                    && filterCheck($settings.bot_posts, b.creator.bot_account)
                     ;
             });
         console.log('got posts:', resPosts);
 
-        if (posts.length + resPosts.length === 0) {
+        if ($posts.length + resPosts.length === 0) {
             status = postCounts ? 'Found 0 posts using specified filters.' : 'Found no posts';
             return false;
         }
 
-        posts = [...posts, ...resPosts];
+        $posts = [...$posts, ...resPosts];
         return true;
     };
+
+    $: preloads = $posts.slice(index, Math.min(index + 5, $posts.length)).map(({ post: p }) => p.thumbnail_url ?? p.url ?? p.embed_video_url);
 
     const nextPost = () => {
         ++index;
 
-        if (index >= posts.length - 5) {
+        if (index >= $posts.length - 5) {
             getNextPosts();
         }
 
-        if (index >= posts.length) {
-            index = posts.length - 1;
+        if (index >= $posts.length) {
+            index = $posts.length - 1;
         }
     };
 
@@ -177,30 +178,18 @@
         }
     }
 
-    const getType = ({ post }: any) => {
-        let link = post.thumbnail_url ?? post.url
-        let type = 'image';
-
-        if (link.endsWith('.mp4')) {
-            type = 'video';
-        }
-
-        if (post.embed_video_url) {
-            type = 'video';
-            link = post.embed_video_url;
-        }
-
-        return { link, type };
-    }
-
     update();
 </script>
 
 <svelte:window on:keydown={keydown} />
 <svelte:head>
-    {#if posts[index]?.community.icon}
-        <link rel="icon" href="{posts[index]?.community.icon}" />
+    {#if $posts[index]?.community.icon}
+        <link rel="icon" href="{$posts[index]?.community.icon}" />
     {/if}
+    {#each preloads as p, i (i)}
+        <link rel="preload" as="image" href={p} />
+    {/each}
+
 </svelte:head>
 
 {#if $modal === 'history'}
@@ -210,6 +199,9 @@
     <Overlay />
     <Communities on:goto={communityGoto} />
 {:else if $modal === 'settings'}
+    <Overlay />
+    <Settings on:goto={communityGoto} on:close={() => {update()}} />
+{:else if $modal === 'saved'}
     <Overlay />
     <Settings on:goto={communityGoto} on:close={() => {update()}} />
 {/if}
@@ -239,8 +231,8 @@
 
     <div class="nav">
         <button on:click={prevPost} disabled={index === 0}>Prev <code>(←)</code></button>
-        <p>{index + 1} / {posts.length}</p>
-        <button on:click={nextPost} disabled={index === posts.length - 1}>Next <code>(→)</code></button>
+        <p>{index + 1} / {$posts.length}</p>
+        <button on:click={nextPost} disabled={index === $posts.length - 1}>Next <code>(→)</code></button>
     </div>
 
     {#if loading}
@@ -250,33 +242,8 @@
     {#if status}
         <h1>{status}</h1>
     {:else}
-        {#if posts[index] && posts[index].post}
-            {@const {counts} = posts[index]}
-            {@const { type, link } = getType(posts[index])}
-            <h1>{posts[index].post.name}</h1>
-            <div class="post-info">
-                <h2>
-                    {#if userquery}
-                        {@const community = mention('!', posts[index].community, $settings.instance)}
-                        In <button class="query-link" on:click={() => {query.query = community; update()}}>{community}</button>
-                    {:else}
-                        {@const user = mention('@', posts[index].creator, $settings.instance)}
-                        By <button class="query-link" on:click={() => {query.query = user; update()}}>{user}</button>
-                    {/if}
-                </h2>
-                <h2 class="score">
-                    <span class:positive={counts.score > 0} class:negative={counts.score < 0}>{counts.score}</span>({(counts.score * 100 / counts.upvotes)|0}%)
-                </h2>
-            </div>
-
-            {#if type === 'video'}
-                <video src="{link}" autoplay controls loop />
-            {:else if type === 'image'}
-                <img src="{link}" alt="post img"/>
-            {:else}
-                <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" />
-            {/if}
-        {/if}
+        <Post {index} {userquery}
+              on:updateQuery={q => {query.query = q.detail; update()}} />
     {/if}
 
     <div class="bottom">
@@ -325,41 +292,5 @@
         flex-direction: row;
         justify-content: space-between;
         width: 100%
-    }
-
-    .post-info {
-        display: flex;
-        flex-direction: row;
-        margin: 0 auto;
-        padding: 0;
-        text-align: center;
-    }
-
-    .score {
-        font-family: monospace;
-    }
-
-    .positive {
-        color: #aea;
-    }
-
-    .negative {
-        color: #eaa;
-    }
-
-    .post-info h2 {
-        padding: 0 1rem;
-        margin: 0;
-    }
-
-    img, video, iframe {
-        flex-grow: initial;
-        height: 75%;
-        margin: auto;
-        border-radius: 5px;
-    }
-
-    iframe {
-        width: 100%;
     }
 </style>

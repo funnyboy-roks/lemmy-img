@@ -8,7 +8,7 @@
     import { sorts, sortsFormatted } from './constants';
 
     import { mention, userFromActor, communityFromActor, filterCheck } from './util'
-    import { history, type QueryData, modal, settings, posts } from './stores';
+    import { history, type QueryData, modal, settings, posts, savedPosts } from './stores';
 
     let loading = false;
 
@@ -40,6 +40,10 @@
     }
 
     const getNextPosts = async () => {
+        if ($modal === 'saved') {
+            $posts = $savedPosts;
+            return false;
+        }
         let url;
 
         let instanceClean = $settings.instance.replace(/\/+$/, '');
@@ -104,6 +108,12 @@
         if (index < 0) index = 0;
     };
 
+    const goto = ({ detail }: any) => {
+        query = detail;
+        $modal = 'none';
+        update();
+    }
+
     const updateHistory = () => {
         let hist = $history;
         const h = hist.filter(e => e.query !== query.query || e.sort !== query.sort);
@@ -123,7 +133,7 @@
         //alert('todo');
         const q = dest.detail;
         query.query = q;
-        $modal = 'communities';
+        $modal = 'none';
         update();
     };
 
@@ -154,6 +164,14 @@
                         $modal = 'none';
                     } else {
                         $modal = 'communities';
+                    }
+                    break;
+                case 'v':
+                    e.preventDefault();
+                    if ($modal === 'saved') {
+                        $modal = 'none';
+                    } else {
+                        $modal = 'saved';
                     }
                     break;
                 case 's':
@@ -201,28 +219,29 @@
 {:else if $modal === 'settings'}
     <Overlay />
     <Settings on:goto={communityGoto} on:close={() => {update()}} />
-{:else if $modal === 'saved'}
-    <Overlay />
-    <Settings on:goto={communityGoto} on:close={() => {update()}} />
 {/if}
 
 <main>
     <div class="top">
         <button on:click={() => $modal = 'history'}>Open History <code>(h)</code></button>
 
-        <form on:submit|preventDefault={update}>
-            <label for="query">Query<label>
-            <input id="query" bind:value={query.query} bind:this={queryInput} type="text" />
+        <div>
+            {#if $modal !== 'saved'}
+                <form on:submit|preventDefault={update}>
+                    <label for="query">Query<label>
+                    <input id="query" bind:value={query.query} bind:this={queryInput} type="text" />
 
-            <label for="sort">Sort<label>
-            <select id="sort" bind:value={query.sort}>
-                {#each sortsFormatted as sort, i (i)}
-                    <option value={i}>{sort}</option>
-                {/each}
-            </select>
+                    <label for="sort">Sort<label>
+                    <select id="sort" bind:value={query.sort}>
+                        {#each sortsFormatted as sort, i (i)}
+                            <option value={i}>{sort}</option>
+                        {/each}
+                    </select>
 
-            <button type="submit">Update</button>
-        </form>
+                    <button type="submit">Update</button>
+                </form>
+            {/if}
+        </div>
 
         <div class="right">
             <button on:click={() => $modal = 'communities'}>Search Communities <code>(c)</code></button>
@@ -243,11 +262,13 @@
         <h1>{status}</h1>
     {:else}
         <Post {index} {userquery}
-              on:updateQuery={q => {query.query = q.detail; update()}} />
+              on:updateQuery={goto} />
     {/if}
 
     <div class="bottom">
-        <div></div>
+        <div>
+            <button on:click={() => { $modal = $modal === 'saved' ? 'none' : 'saved'; update()}}>{$modal === 'saved' ? 'Back' : 'Saved Posts'} <code>(v)</code></button>
+        </div>
         <div></div>
         <div class="right">
             <button on:click={() => $modal = 'settings'}>Settings <code>(s)</code></button>

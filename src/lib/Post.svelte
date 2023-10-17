@@ -3,8 +3,8 @@
     export let userquery: boolean;
 
     import { mention } from '../util'
-    import { posts, settings } from '../stores';
-    import { createEventDispatcher } from 'svelte';
+    import { posts, settings, savedPosts } from '../stores';
+    import { createEventDispatcher, onMount } from 'svelte';
 
 
     const getType = ({ post }: any) => {
@@ -23,14 +23,55 @@
         return { link, type };
     }
 
+    const isSaved = (index: number): boolean =>  {
+        const post = $posts[index];
+        if (!post) return false;
+        for (const s of $savedPosts) {
+            console.log ({ s, post });
+            if (s.post.ap_id === post.post.ap_id) {
+                console.log('saved')
+                return true;
+            }
+        }
+        console.log('not saved')
+        return false;
+    }
 
+    let star: string;
+
+    let saved: boolean;
+    $: {
+        saved = isSaved(index);
+        updateStar();
+    };
+
+    const updateStar = () => {
+        star = saved ? '★' : '☆';
+    }
+
+    const toggleSave = () => {
+        console.log('saving', saved);
+        if (saved) {
+            $savedPosts = $savedPosts.filter(p => p.post.ap_id !== $posts[index].post.ap_id);
+            saved = false;
+        } else {
+            $savedPosts = [...$savedPosts, $posts[index]];
+            saved = true;
+        }
+    }
+
+    setTimeout(() => {
+        saved = isSaved(index);
+        updateStar()
+    }, 500);
     const dispatch = createEventDispatcher();
+
 </script>
 {#if $posts[index] && $posts[index].post}
     {@const post = $posts[index]}
     {@const { counts } = post}
     {@const { type, link } = getType(post)}
-    <h1>{post.post.name}</h1>
+    <h1>{post.post.name} <button class="save" on:mouseover={() => star = '★'} on:mouseleave={updateStar} on:click={toggleSave}>{star}</button></h1>
     <div class="post-info">
         <h2>
             {#if userquery}
@@ -84,7 +125,6 @@
 
     .post-info h2 {
         padding: 0 1rem;
-        margin: 0;
     }
 
     img, video, iframe {
@@ -96,5 +136,13 @@
 
     iframe {
         width: 100%;
+    }
+
+    .save {
+        color: gold;
+        background: none;
+        border: none;
+        outline: none;
+        font-size: 2rem;
     }
 </style>

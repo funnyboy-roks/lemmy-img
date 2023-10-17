@@ -19,6 +19,7 @@ export interface QueryData {
 
 export const instanceStore = localStore<string>('instance', 'https://lemmy.ml');
 export const history = localStore<QueryData[]>('history', []);
+export const savedPosts = localStore<any[]>('savedPosts', []);
 export const posts = writable<any[]>([]);
 
 export type Modal = 'none' | 'history' | 'communities' | 'settings' | 'saved';

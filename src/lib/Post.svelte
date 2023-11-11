@@ -3,7 +3,7 @@
     export let userquery: boolean;
 
     import { mention } from '../util'
-    import { posts, settings, savedPosts } from '../stores';
+    import { posts, settings, savedPosts, modal } from '../stores';
     import { createEventDispatcher, onMount } from 'svelte';
 
 
@@ -74,7 +74,12 @@
     <h1>{post.post.name} <button class="save" on:mouseover={() => star = '★'} on:mouseleave={updateStar} on:click={toggleSave}>{star}</button></h1>
     <div class="post-info">
         <h2>
-            {#if userquery}
+            {#if $modal == 'saved'}
+                {@const community = mention('!', post.community, $settings.instance)}
+                {@const user = mention('@', post.creator, $settings.instance)}
+                By <button class="query-link" on:click={() => dispatch('updateQuery', user)}>{user}</button>
+                In <button class="query-link" on:click={() => dispatch('updateQuery', community)}>{community}</button>
+            {:else if userquery}
                 {@const community = mention('!', post.community, $settings.instance)}
                 In <button class="query-link" on:click={() => dispatch('updateQuery', community)}>{community}</button>
             {:else}

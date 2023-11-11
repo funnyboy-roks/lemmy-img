@@ -109,7 +109,7 @@
     };
 
     const goto = ({ detail }: any) => {
-        query = detail;
+        query.query = detail;
         $modal = 'none';
         update();
     }

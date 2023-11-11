@@ -7,6 +7,7 @@
     import { createEventDispatcher, onMount } from 'svelte';
     import Comment from './Comment.svelte'
 
+    const DTF = Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'long', year: 'numeric' });
 
     const getType = ({ post }: any) => {
         let link = post.thumbnail_url ?? post.url
@@ -110,6 +111,9 @@
                 {@const user = mention('@', post.creator, $settings.instance)}
                 By <button class="query-link" on:click={() => dispatch('updateQuery', user)}>{user}</button>
             {/if}
+        </h2>
+        <h2>
+            {DTF.format(new Date($posts[index].post.published))}
         </h2>
         <h2 class="score">
             <span class:positive={counts.score > 0} class:negative={counts.score < 0}>{counts.score}</span>({(counts.score * 100 / counts.upvotes)|0}%)

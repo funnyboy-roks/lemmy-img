@@ -38,7 +38,7 @@ input {
     width: 15rem;
 }
 
-.query-link {
+a, .query-link {
     text-decoration: 2px dotted underline;
     width: unset;
     background: unset;
@@ -50,6 +50,20 @@ input {
     margin: unset;
 }
 
-.query-link:hover {
+a:hover, .query-link:hover {
     text-decoration: 2px solid underline;
+}
+
+blockquote {
+    margin: .5rem;
+    padding: .25rem;
+    padding-left: 1rem;
+    margin-left: 1rem;
+    border-left: 2px solid grey;
+    background: #5f71;
+    width: unset;
+}
+
+a {
+    color: cyan;
 }

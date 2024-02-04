@@ -1,10 +1,11 @@
 <script lang="ts">
     export let index: number;
     export let userquery: boolean;
+    export let show_user_and_comm: boolean = false;
 
     import { mention, treeComments } from '../util'
     import { posts, settings, savedPosts, modal } from '../stores';
-    import { createEventDispatcher, onMount } from 'svelte';
+    import { createEventDispatcher } from 'svelte';
     import Comment from './Comment.svelte'
 
     const DTF = Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'long', year: 'numeric' });
@@ -99,7 +100,7 @@
     <h1>{post.post.name} <button class="save" on:mouseover={() => star = '★'} on:mouseleave={updateStar} on:click={toggleSave}>{star}</button></h1>
     <div class="post-info">
         <h2>
-            {#if $modal == 'saved'}
+            {#if $modal == 'saved' || show_user_and_comm }
                 {@const community = mention('!', post.community, $settings.instance)}
                 {@const user = mention('@', post.creator, $settings.instance)}
                 By <button class="query-link" on:click={() => dispatch('updateQuery', user)}>{user}</button>
@@ -144,7 +145,7 @@
                 <h1>Loading...</h1>
             {:else}
                 {#each comments as comment, i (i)}
-                    <Comment self={comment} index={i} depth={0} op={$posts[index].creator.actor_id} />
+                    <Comment self={comment} index={i} depth={0} op={$posts[index].creator.actor_id} on:updateQuery />
                 {:else}
                     <h1>No Comments</h1>
                 {/each}
@@ -174,14 +175,6 @@
     .score {
         font-family: monospace;
         font-size: 1.75rem;
-    }
-
-    .positive {
-        color: #aea;
-    }
-
-    .negative {
-        color: #eaa;
     }
 
     .post-info h2 {
@@ -214,6 +207,6 @@
 
     .comments {
         margin: auto;
-
+        background: black;
     }
 </style>

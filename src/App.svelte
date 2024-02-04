@@ -7,7 +7,7 @@
 
     import { sorts, sortsFormatted } from './constants';
 
-    import { mention, userFromActor, communityFromActor, filterCheck } from './util'
+    import { userFromActor, communityFromActor, filterCheck } from './util'
     import { history, type QueryData, modal, settings, posts, savedPosts } from './stores';
 
     let loading = false;
@@ -19,6 +19,7 @@
     let userquery: boolean = false;
     let status: string | null = null;
     let preloads: string[] = [];
+    let next_page_cursor: string = '';
 
     let query: QueryData = {
         query: $history[0]?.query ?? '!unixporn@lemmy.ml',
@@ -29,8 +30,9 @@
         if (loading) return;
         loading = true;
         index = 0;
-        pageIndex = 0;
+        // pageIndex = 0;
         $posts = [];
+        next_page_cursor = '';
         userquery = query.query.startsWith('@')
         if (await getNextPosts()) {
             updateHistory();
@@ -48,10 +50,24 @@
 
         let instanceClean = $settings.instance.replace(/\/+$/, '');
         if (userquery) {
-            url = `${instanceClean}/api/v3/user?username=${query.query.substring(1)}&sort=${sorts[query.sort]}&page=${++pageIndex}&limit=20`;
+            const params = new URLSearchParams();
+            params.set('username', query.query.substring(1));
+            params.set('sort', sorts[query.sort]);
+            // params.set('page', ++pageIndex + '');
+            params.set('limit', '20');
+            if (next_page_cursor) params.set('page_cursor', next_page_cursor);
+            url = `${instanceClean}/api/v3/user?${params}`;
         } else {
-            const name = query.query.startsWith('!') ? query.query.substring(1) : query.query;
-            url = `${instanceClean}/api/v3/post/list?community_name=${name}&sort=${sorts[query.sort]}&page=${++pageIndex}&limit=20`;
+            const params = new URLSearchParams();
+            if (query.query === '.all') {
+            } else {
+                params.set('community_name', query.query.startsWith('!') ? query.query.substring(1) : query.query);
+            }
+            params.set('sort', sorts[query.sort]);
+            // params.set('page', ++pageIndex + '');
+            params.set('limit', '20');
+            if (next_page_cursor) params.set('page_cursor', next_page_cursor);
+            url = `${instanceClean}/api/v3/post/list?${params}`;
         }
 
         console.log('getting next posts from', url);
@@ -64,6 +80,8 @@
 
         console.log('got body:', body);
         const postCounts = body.posts.length;
+        next_page_cursor = body.next_page;
+        console.log({ next_page_cursor });
         const resPosts = body
             .posts
             .filter((b: any) => {
@@ -144,6 +162,15 @@
                 case 'ArrowRight':
                     e.preventDefault()
                     nextPost();
+                    break;
+                case 'Home':
+                    e.preventDefault()
+                    index = 0;
+                    break;
+                case 'End':
+                    e.preventDefault()
+                    index = $posts.length - 1;
+                    getNextPosts();
                     break;
                 case 'ArrowLeft':
                     e.preventDefault()
@@ -262,7 +289,9 @@
         <h1>{status}</h1>
     {:else}
         <Post {index} {userquery}
-              on:updateQuery={goto} />
+            show_user_and_comm={$modal === 'saved' || query.query === '.all'}
+            on:updateQuery={goto}
+            />
     {/if}
 
     <div class="bottom">
@@ -302,6 +331,7 @@
         display: flex;
         flex-direction: row;
         margin: 0 auto;
+        margin-top: 4rem;
     }
 
     .nav button {
@@ -312,6 +342,18 @@
         display: flex;
         flex-direction: row;
         justify-content: space-between;
-        width: 100%
+        width: 100%;
+    }
+
+    .bottom {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+    }
+
+    .top {
+        position: absolute;
+        top: 0;
+        left: 0;
     }
 </style>

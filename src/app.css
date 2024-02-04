@@ -67,3 +67,12 @@ blockquote {
 a {
     color: cyan;
 }
+
+.positive {
+    color: #aea;
+}
+
+.negative {
+    color: #eaa;
+}
+

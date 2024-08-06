@@ -19,11 +19,13 @@
         } else if (link.endsWith('.mp4')) {
             type = 'video';
         } else if (post.embed_video_url) {
-            type = 'video';
-            link = post.embed_video_url;
-            if (link.includes('embed')) {
-                type = 'embed';
-            }
+            type = 'embed';
+            link = post.url.replace(/\/watch\//gi, '/ifr/');
+            // type = 'video';
+            // link = post.embed_video_url;
+            // if (link.includes('embed')) {
+            //     type = 'embed';
+            // }
         }
 
         console.log({ link, type });

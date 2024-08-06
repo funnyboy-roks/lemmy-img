@@ -15,7 +15,6 @@
     let queryInput: any;
 
     let index = 0;
-    let pageIndex = 0;
     let userquery: boolean = false;
     let status: string | null = null;
     let preloads: string[] = [];
@@ -30,7 +29,6 @@
         if (loading) return;
         loading = true;
         index = 0;
-        // pageIndex = 0;
         $posts = [];
         next_page_cursor = '';
         userquery = query.query.startsWith('@')
@@ -46,6 +44,11 @@
             $posts = $savedPosts;
             return false;
         }
+
+        if (next_page_cursor === 'END') {
+            return false;
+        }
+
         let url;
 
         let instanceClean = $settings.instance.replace(/\/+$/, '');
@@ -53,7 +56,6 @@
             const params = new URLSearchParams();
             params.set('username', query.query.substring(1));
             params.set('sort', sorts[query.sort]);
-            // params.set('page', ++pageIndex + '');
             params.set('limit', '20');
             if (next_page_cursor) params.set('page_cursor', next_page_cursor);
             url = `${instanceClean}/api/v3/user?${params}`;
@@ -64,7 +66,6 @@
                 params.set('community_name', query.query.startsWith('!') ? query.query.substring(1) : query.query);
             }
             params.set('sort', sorts[query.sort]);
-            // params.set('page', ++pageIndex + '');
             params.set('limit', '20');
             if (next_page_cursor) params.set('page_cursor', next_page_cursor);
             url = `${instanceClean}/api/v3/post/list?${params}`;
@@ -81,6 +82,9 @@
         console.log('got body:', body);
         const postCounts = body.posts.length;
         next_page_cursor = body.next_page;
+        if (!next_page_cursor) {
+            next_page_cursor = 'END';
+        }
         console.log({ next_page_cursor });
         const resPosts = body
             .posts
@@ -178,7 +182,6 @@
                     break;
                 case 'h':
                     e.preventDefault();
-                    // @ts-ignore
                     if ($modal === 'history') {
                         $modal = 'none';
                     } else {
@@ -200,6 +203,7 @@
                     } else {
                         $modal = 'saved';
                     }
+                    update();
                     break;
                 case 's':
                     e.preventDefault();

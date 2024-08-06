@@ -7,6 +7,7 @@
     import { posts, settings, savedPosts, modal } from '../stores';
     import { createEventDispatcher } from 'svelte';
     import Comment from './Comment.svelte'
+    import Markdown from 'svelte-exmarkdown';
 
     const DTF = Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'long', year: 'numeric' });
 
@@ -52,10 +53,16 @@
     let saved: boolean;
     let showingComments = false;
     let loadingComments = false;
+    let showingBody = false;
+    let imageIndex = 0;
+    let images: string[] = [];
     $: {
         showingComments = false;
         loadingComments = false;
+        showingBody = false;
         saved = isSaved(index);
+        imageIndex = 0;
+        images = bodyImages($posts[index]?.post.body);
         updateStar();
     };
 
@@ -74,6 +81,13 @@
         }
     }
 
+    const bodyImages = (s: string): string[] => {
+        if (!s) return [];
+        return s.match(/!\[.*?\]\(.*?\)/g)
+            ?.map(m => m.replace(/^!\[.*?\]\(/, ''))
+            .map(s => s.substring(0, s.length - 1)) ?? []
+    };
+
     let comments: any[] = [];
     const getComments = async () => {
         let instanceClean = $settings.instance.replace(/\/+$/, '');
@@ -88,15 +102,39 @@
         loadingComments = false;
     }
 
+    const toggleBody = () => {
+        showingBody = $posts[index].post.body && !showingBody;
+    };
+
     setTimeout(() => {
         saved = isSaved(index);
         updateStar()
     }, 500);
     const dispatch = createEventDispatcher();
 
+    const keydown = (e: KeyboardEvent) => {
+        // `any` cast because nodeName "doesn't exist" on e.target
+        if ((e.target as any).nodeName === 'INPUT') return;
+        switch (e.key) {
+            case 'b':
+                toggleBody();
+                break;
+            case 'ArrowDown':
+                ++imageIndex;
+                if (imageIndex > images.length) imageIndex = images.length;
+                break;
+            case 'ArrowUp':
+                --imageIndex;
+                if (imageIndex < 0) imageIndex = 0;
+                break;
+        }
+    };
+
 </script>
 
-{#if $posts[index] && $posts[index].post}
+<svelte:window on:keydown={keydown} />
+
+{#if $posts[index]?.post && $posts[index].post}
     {@const post = $posts[index]}
     {@const { counts } = post}
     <h1>{post.post.name} <button class="save" on:mouseover={() => star = '★'} on:mouseleave={updateStar} on:click={toggleSave}>{star}</button></h1>
@@ -123,25 +161,21 @@
         </h2>
         {#if post.counts.comments > 0}
             {#if showingComments}
-                <button id="comments" on:click={() => showingComments = false}>Hide Comments</button>
+                <button class="info-button" on:click={() => showingComments = false}>Hide Comments</button>
             {:else}
-                <button id="comments" on:click={() => showComments()}>Comments ({ post.counts.comments })</button>
+                <button class="info-button" on:click={() => showComments()}>Comments ({ post.counts.comments })</button>
             {/if}
+        {/if}
+        {#if post.post.body}
+            <button class="info-button" on:click={toggleBody}>{ showingBody ? 'Hide' : 'Show' } Body {#if images.length}({imageIndex}/{images.length}){/if}</button>
         {/if}
     </div>
 
-    {#if !showingComments}
-        {@const { type, link } = getType(post)}
-        {#if type === 'video'}
-            <video src="{link}" autoplay controls loop>
-                <track kind="captions" />
-            </video>
-        {:else if type === 'image'}
-            <img src="{link}" alt="post img"/>
-        {:else}
-            <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" />
-        {/if}
-    {:else}
+    {#if showingBody}
+        <div class="body">
+            <Markdown md={post.post.body} />
+        </div>
+    {:else if showingComments}
         <div class="comments">
             {#if loadingComments}
                 <h1>Loading...</h1>
@@ -153,6 +187,19 @@
                 {/each}
             {/if}
         </div>
+    {:else if imageIndex > 0}
+        <img src="{images[imageIndex - 1]}" alt="post img {imageIndex}" />
+    {:else}
+        {@const { type, link } = getType(post)}
+        {#if type === 'video'}
+            <video src="{link}" autoplay controls loop>
+                <track kind="captions" />
+            </video>
+        {:else if type === 'image'}
+            <img src="{link}" alt="post img"/>
+        {:else}
+            <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" />
+        {/if}
     {/if}
 {/if}
 
@@ -202,13 +249,22 @@
         font-size: 2rem;
     }
 
-    #comments {
-        margin: auto;
+    .info-button {
+        margin: auto .25rem;
         padding: .25rem 1rem;
     }
 
     .comments {
         margin: auto;
         background: black;
+    }
+
+    .body {
+        width: 50%;
+        margin: auto;
+    }
+
+    .body :global(img) {
+        max-width: 100%;
     }
 </style>

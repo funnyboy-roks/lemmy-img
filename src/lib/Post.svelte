@@ -49,6 +49,8 @@
     }
 
     let star: string;
+    let loadingImage: boolean;
+    let imageError: boolean;
 
     let saved: boolean;
     let showingComments = false;
@@ -58,8 +60,8 @@
     let images: string[] = [];
     $: {
         showingComments = false;
-        loadingComments = false;
         showingBody = false;
+        imageError = false
         saved = isSaved(index);
         imageIndex = 0;
         images = bodyImages($posts[index]?.post.body);
@@ -112,6 +114,23 @@
     }, 500);
     const dispatch = createEventDispatcher();
 
+    let loading: number;
+
+    const loadstart = ({ target }) => {
+        loading = setTimeout(() => {
+            loadingImage = target.tagName === 'VIDEO' ? target.readyState !== 4 : !target.complete;
+        }, 100);
+    }
+    const load = () => {
+        console.log('load');
+        clearTimeout(loading);
+        loadingImage = false;
+    };
+    const error = (err: any) => {
+        console.error(err);
+        imageError = true;
+    };
+
     const keydown = (e: KeyboardEvent) => {
         // `any` cast because nodeName "doesn't exist" on e.target
         if ((e.target as any).nodeName === 'INPUT') return;
@@ -129,7 +148,6 @@
                 break;
         }
     };
-
 </script>
 
 <svelte:window on:keydown={keydown} />
@@ -192,13 +210,23 @@
     {:else}
         {@const { type, link } = getType(post)}
         {#if type === 'video'}
-            <video src="{link}" autoplay controls loop>
+            <video src="{link}" autoplay controls loop style={loadingImage || imageError ? 'display:none' : ''} on:loadstart={loadstart} on:load={load} on:error={error}>
                 <track kind="captions" />
             </video>
         {:else if type === 'image'}
-            <img src="{link}" alt="post img"/>
+            <img src="{link}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''} on:loadstart={loadstart} on:load={load} on:error={error} />
         {:else}
-            <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" />
+            <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} on:loadstart={loadstart} on:load={load} on:error={error} />
+        {/if}
+        
+        {#if imageError}
+            <h1 class="loading negative">
+                Error loading image
+            </h1>
+        {:else if loadingImage}
+            <h1 class="loading">
+                Loading Image...
+            </h1>
         {/if}
     {/if}
 {/if}
@@ -266,5 +294,10 @@
 
     .body :global(img) {
         max-width: 100%;
+    }
+
+    .loading {
+        width: 100%;
+        text-align: center;
     }
 </style>

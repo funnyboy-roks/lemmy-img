@@ -239,7 +239,7 @@
         {:else if type === 'img'}
             <img src="{objectUrl}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''}>
         {:else if type === 'embed'}
-            <iframe src="{url}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} sandbox="allow-forms allow-scripts "/>
+            <iframe src="{url}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"/>
         {/if}
         
         {#if imageError}

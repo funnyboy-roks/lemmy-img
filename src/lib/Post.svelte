@@ -29,8 +29,6 @@
             // }
         }
 
-        console.log({ link, type });
-
         return { link, type };
     }
 
@@ -38,13 +36,10 @@
         const post = $posts[index];
         if (!post) return false;
         for (const s of $savedPosts) {
-            console.log ({ s, post });
             if (s.post.ap_id === post.post.ap_id) {
-                console.log('saved')
                 return true;
             }
         }
-        console.log('not saved')
         return false;
     }
 
@@ -58,6 +53,9 @@
     let showingBody = false;
     let imageIndex = 0;
     let images: string[] = [];
+    let type: 'img' | 'video' | 'embed';
+
+    let fetchSignal = new AbortController();
     $: {
         showingComments = false;
         showingBody = false;
@@ -65,15 +63,50 @@
         saved = isSaved(index);
         imageIndex = 0;
         images = bodyImages($posts[index]?.post.body);
+        type = 'img';
+        fetchSignal.abort();
+        fetchSignal = new AbortController();
         updateStar();
+        fetchImage(fetchSignal.signal);
     };
 
-    const updateStar = () => {
-        star = saved ? '★' : '☆';
-    }
+    let objectUrl: string;
+    let url: string;
+    const fetchImage = async (signal: AbortSignal) => {
+        loadingImage = true;
+        await (async () => {
+            if (!$posts[index]) return;
+            if ($posts[index].post.embed_video_url) {
+                url = $posts[index].post.embed_video_url;
+                type = 'embed';
+                return;
+            }
+            let blob: Blob;
+            url = $posts[index].post.url;
+            try {
+                const res = await fetch(url, { signal });
+                blob = await res.blob();
+            } catch (ex) {
+                console.error(ex);
+                type = 'embed';
+                return;
+            }
+            objectUrl = URL.createObjectURL(blob);
+
+            if (blob.type.includes('image')) {
+                type = 'img';
+            } else if (blob.type.includes('video')) {
+                type = 'video';
+            } else {
+                type = 'embed';
+            }
+        })();
+        loadingImage = false;
+    };
+
+    const updateStar = () => star = saved ? '★' : '☆';
 
     const toggleSave = () => {
-        console.log('saving', saved);
         if (saved) {
             $savedPosts = $savedPosts.filter(p => p.post.ap_id !== $posts[index].post.ap_id);
             saved = false;
@@ -114,26 +147,17 @@
     }, 500);
     const dispatch = createEventDispatcher();
 
-    let loading: number;
-
-    const loadstart = ({ target }) => {
-        loading = setTimeout(() => {
-            loadingImage = target.tagName === 'VIDEO' ? target.readyState !== 4 : !target.complete;
-        }, 100);
-    }
-    const load = () => {
-        console.log('load');
-        clearTimeout(loading);
-        loadingImage = false;
-    };
-    const error = (err: any) => {
-        console.error(err);
-        imageError = true;
+    const checkload = (elt: HTMLImageElement | HTMLVideoElement) => {
+        loadingImage = elt instanceof HTMLVideoElement ? elt.readyState !== 4 : !elt.complete;
+        if (loadingImage) {
+            setTimeout(() => {
+                checkload(elt);
+            }, 50);
+        }
     };
 
     const keydown = (e: KeyboardEvent) => {
-        // `any` cast because nodeName "doesn't exist" on e.target
-        if ((e.target as any).nodeName === 'INPUT') return;
+        if (e.target instanceof HTMLInputElement) return;
         switch (e.key) {
             case 'b':
                 toggleBody();
@@ -208,15 +232,14 @@
     {:else if imageIndex > 0}
         <img src="{images[imageIndex - 1]}" alt="post img {imageIndex}" />
     {:else}
-        {@const { type, link } = getType(post)}
         {#if type === 'video'}
-            <video src="{link}" autoplay controls loop style={loadingImage || imageError ? 'display:none' : ''} on:loadstart={loadstart} on:load={load} on:error={error}>
+            <video src="{objectUrl}" autoplay controls loop style={loadingImage || imageError ? 'display:none' : ''}>
                 <track kind="captions" />
             </video>
-        {:else if type === 'image'}
-            <img src="{link}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''} on:loadstart={loadstart} on:load={load} on:error={error} />
-        {:else}
-            <iframe src="{link}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} on:loadstart={loadstart} on:load={load} on:error={error} />
+        {:else if type === 'img'}
+            <img src="{objectUrl}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''}>
+        {:else if type === 'embed'}
+            <iframe src="{url}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} sandbox="allow-forms allow-scripts "/>
         {/if}
         
         {#if imageError}

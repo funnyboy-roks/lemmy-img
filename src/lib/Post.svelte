@@ -70,7 +70,6 @@
         fetchImage(fetchSignal.signal);
     };
 
-    let objectUrl: string;
     let url: string;
     const fetchImage = async (signal: AbortSignal) => {
         loadingImage = true;
@@ -81,21 +80,21 @@
                 type = 'embed';
                 return;
             }
-            let blob: Blob;
             url = $posts[index].post.url;
+            let contentType;
             try {
-                const res = await fetch(url, { signal });
-                blob = await res.blob();
+                const res = await fetch(url, { signal, mode: 'no-cors' });
+                contentType = res.headers.get('content-type') ?? 'image';
+                fetchSignal.abort();
             } catch (ex) {
                 console.error(ex);
                 type = 'embed';
                 return;
             }
-            objectUrl = URL.createObjectURL(blob);
 
-            if (blob.type.includes('image')) {
+            if (contentType.includes('image')) {
                 type = 'img';
-            } else if (blob.type.includes('video')) {
+            } else if (contentType.includes('video')) {
                 type = 'video';
             } else {
                 type = 'embed';
@@ -233,11 +232,11 @@
         <img src="{images[imageIndex - 1]}" alt="post img {imageIndex}" />
     {:else}
         {#if type === 'video'}
-            <video src="{objectUrl}" autoplay controls loop style={loadingImage || imageError ? 'display:none' : ''}>
+            <video src="{url}" autoplay controls loop style={loadingImage || imageError ? 'display:none' : ''}>
                 <track kind="captions" />
             </video>
         {:else if type === 'img'}
-            <img src="{objectUrl}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''}>
+            <img src="{url}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''}>
         {:else if type === 'embed'}
             <iframe src="{url}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"/>
         {/if}

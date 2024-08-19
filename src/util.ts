@@ -1,4 +1,8 @@
+import type { Plugin } from "svelte-exmarkdown";
 import type { User, Community, Filter } from "./stores";
+import { gfmPlugin } from 'svelte-exmarkdown/gfm';
+import rehypeStringify from "rehype-stringify";
+import rehypeRaw from "rehype-raw";
 
 export const mention = (prefix: string, { name, actor_id }: any, host: string = ''): string => {
     const instance = new URL(actor_id).hostname;
@@ -69,3 +73,8 @@ export const treeComments = (comments: any[]): any[] => {
 
     return tree;
 }
+
+export const markdownPlugins: Plugin[] = [gfmPlugin()];
+
+export const isImage = (url: string) => /(http)?s?:?(\/\/[^"']*\.(?:jpg|jpeg|gif|png|svg|webp))/.test(url);
+export const isVideo = (url: string) => /(http)?s?:?(\/\/[^"']*\.(?:mp4|webm))/.test(url);

@@ -28,7 +28,7 @@
             </div>
         </div>
         <div style="color: #aaa">
-        <Markdown md={self.comment.content} />
+            <Markdown md={self.comment.content} plugins={markdownPlugins} />
         </div>
         {#if self.children}
             {#each self.children as comment, i (i)}

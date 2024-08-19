@@ -3,34 +3,14 @@
     export let userquery: boolean;
     export let show_user_and_comm: boolean = false;
 
-    import { mention, treeComments } from '../util'
+    import { markdownPlugins, mention, treeComments } from '../util'
     import { posts, settings, savedPosts, modal } from '../stores';
     import { createEventDispatcher } from 'svelte';
     import Comment from './Comment.svelte'
+    import Image from './Image.svelte';
     import Markdown from 'svelte-exmarkdown';
 
     const DTF = Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'long', year: 'numeric' });
-
-    const getType = ({ post }: any) => {
-        let link = post.thumbnail_url ?? post.url
-        let type = 'image';
-
-        if (link.includes('embed')) {
-            type = 'embed';
-        } else if (link.endsWith('.mp4')) {
-            type = 'video';
-        } else if (post.embed_video_url) {
-            type = 'embed';
-            link = post.url.replace(/\/watch\//gi, '/ifr/');
-            // type = 'video';
-            // link = post.embed_video_url;
-            // if (link.includes('embed')) {
-            //     type = 'embed';
-            // }
-        }
-
-        return { link, type };
-    }
 
     const isSaved = (index: number): boolean =>  {
         const post = $posts[index];
@@ -44,8 +24,6 @@
     }
 
     let star: string;
-    let loadingImage: boolean;
-    let imageError: boolean;
 
     let saved: boolean;
     let showingComments = false;
@@ -54,53 +32,14 @@
     let imageIndex = 0;
     let images: string[] = [];
     let type: 'img' | 'video' | 'embed';
-
-    let fetchSignal = new AbortController();
     $: {
         showingComments = false;
         showingBody = false;
-        imageError = false
         saved = isSaved(index);
         imageIndex = 0;
         images = bodyImages($posts[index]?.post.body);
         type = 'img';
-        fetchSignal.abort();
-        fetchSignal = new AbortController();
         updateStar();
-        fetchImage(fetchSignal.signal);
-    };
-
-    let url: string;
-    const fetchImage = async (signal: AbortSignal) => {
-        loadingImage = true;
-        await (async () => {
-            if (!$posts[index]) return;
-            if ($posts[index].post.embed_video_url) {
-                url = $posts[index].post.embed_video_url;
-                type = 'embed';
-                return;
-            }
-            url = $posts[index].post.url;
-            let contentType;
-            try {
-                const res = await fetch(url, { signal, mode: 'no-cors' });
-                contentType = res.headers.get('content-type') ?? 'image';
-                fetchSignal.abort();
-            } catch (ex) {
-                console.error(ex);
-                type = 'embed';
-                return;
-            }
-
-            if (contentType.includes('image')) {
-                type = 'img';
-            } else if (contentType.includes('video')) {
-                type = 'video';
-            } else {
-                type = 'embed';
-            }
-        })();
-        loadingImage = false;
     };
 
     const updateStar = () => star = saved ? '★' : '☆';
@@ -144,16 +83,8 @@
         saved = isSaved(index);
         updateStar()
     }, 500);
-    const dispatch = createEventDispatcher();
 
-    const checkload = (elt: HTMLImageElement | HTMLVideoElement) => {
-        loadingImage = elt instanceof HTMLVideoElement ? elt.readyState !== 4 : !elt.complete;
-        if (loadingImage) {
-            setTimeout(() => {
-                checkload(elt);
-            }, 50);
-        }
-    };
+    const dispatch = createEventDispatcher();
 
     const keydown = (e: KeyboardEvent) => {
         if (e.target instanceof HTMLInputElement) return;
@@ -169,6 +100,12 @@
                 --imageIndex;
                 if (imageIndex < 0) imageIndex = 0;
                 break;
+            case 'm':
+                if (showingComments) {
+                    showingComments = false;
+                } else {
+                    showComments();
+                }
         }
     };
 </script>
@@ -202,19 +139,19 @@
         </h2>
         {#if post.counts.comments > 0}
             {#if showingComments}
-                <button class="info-button" on:click={() => showingComments = false}>Hide Comments</button>
+                <button class="info-button" on:click={() => showingComments = false}>Hide Comments <code>(m)</code></button>
             {:else}
-                <button class="info-button" on:click={() => showComments()}>Comments ({ post.counts.comments })</button>
+                <button class="info-button" on:click={() => showComments()}>Comments ({ post.counts.comments }) <code>(m)</code></button>
             {/if}
         {/if}
         {#if post.post.body}
-            <button class="info-button" on:click={toggleBody}>{ showingBody ? 'Hide' : 'Show' } Body {#if images.length}({imageIndex}/{images.length}){/if}</button>
+            <button class="info-button" on:click={toggleBody}>{ showingBody ? 'Hide' : 'Show' } Body {#if images.length}({imageIndex}/{images.length}){/if} <code>(b)</code></button>
         {/if}
     </div>
 
     {#if showingBody}
         <div class="body">
-            <Markdown md={post.post.body} />
+            <Markdown md={post.post.body} plugins={markdownPlugins} />
         </div>
     {:else if showingComments}
         <div class="comments">
@@ -231,25 +168,9 @@
     {:else if imageIndex > 0}
         <img src="{images[imageIndex - 1]}" alt="post img {imageIndex}" />
     {:else}
-        {#if type === 'video'}
-            <video src="{url}" autoplay controls loop style={loadingImage || imageError ? 'display:none' : ''}>
-                <track kind="captions" />
-            </video>
-        {:else if type === 'img'}
-            <img src="{url}" alt="post img" style={loadingImage || imageError ? 'display:none' : ''}>
-        {:else if type === 'embed'}
-            <iframe src="{url}" frameborder="0" allowfullscreen title="iframe" style={loadingImage || imageError ? 'display:none' : ''} sandbox="allow-forms allow-modals allow-orientation-lock allow-pointer-lock allow-popups allow-popups-to-escape-sandbox allow-presentation allow-same-origin allow-scripts"/>
-        {/if}
-        
-        {#if imageError}
-            <h1 class="loading negative">
-                Error loading image
-            </h1>
-        {:else if loadingImage}
-            <h1 class="loading">
-                Loading Image...
-            </h1>
-        {/if}
+        {#key post}
+            <Image post={post.post} />
+        {/key}
     {/if}
 {/if}
 
@@ -280,15 +201,11 @@
         padding: 0 1rem;
     }
 
-    img, video, iframe {
+    img {
         flex-grow: initial;
         height: 75%;
         margin: auto;
         border-radius: 5px;
-    }
-
-    iframe {
-        width: 100%;
     }
 
     .save {
@@ -316,10 +233,5 @@
 
     .body :global(img) {
         max-width: 100%;
-    }
-
-    .loading {
-        width: 100%;
-        text-align: center;
     }
 </style>

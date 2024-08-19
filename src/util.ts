@@ -1,8 +1,6 @@
 import type { Plugin } from "svelte-exmarkdown";
 import type { User, Community, Filter } from "./stores";
 import { gfmPlugin } from 'svelte-exmarkdown/gfm';
-import rehypeStringify from "rehype-stringify";
-import rehypeRaw from "rehype-raw";
 
 export const mention = (prefix: string, { name, actor_id }: any, host: string = ''): string => {
     const instance = new URL(actor_id).hostname;

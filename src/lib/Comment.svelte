@@ -3,6 +3,7 @@
     import { mention } from '../util';
     import { settings } from '../stores';
     import { createEventDispatcher } from 'svelte';
+    import { markdownPlugins } from '../util';
 
     const colour = (n: number): string => {
         const steps = 12;

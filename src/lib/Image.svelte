@@ -8,6 +8,7 @@
     let imgSrc: string | undefined;
     $: {
         ({ url } = post);
+        url = url.replace('/watch/', '/ifr/');
         const thumbnail = post.thumbnail_url;
 
         if (thumbnail) {
@@ -22,7 +23,17 @@
     let error = false;
     let loading = true;
 
+    const keydown = (e: KeyboardEvent) => {
+        if (e.target instanceof HTMLInputElement) return;
+        switch (e.key) {
+            case 'l':
+                loading = !loading;
+                break;
+        }
+    };
 </script>
+
+<svelte:window on:keydown={keydown} />
 
 {#if error}
     Error
@@ -30,7 +41,7 @@
     Loading
 {/if}
 
-{#if url && (isVideo(url) || post.embed_video_url)}
+{#if url && (isVideo(url)/* || post.embed_video_url*/)}
     <video autoplay controls loop
            on:error={() => error = true} on:load={() => loading = false}
            class:hide={error || loading}
